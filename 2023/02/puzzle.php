@@ -36,6 +36,7 @@ readonly class Game
 $input = fopen('input.txt', 'r');
 $valid = [];
 $invalid = [];
+$powers = [];
 while (!feof($input)) {
     $parts = [];
     if (preg_match('/Game (?<id>\d+): (?<plays>.*)/', fgets($input), $parts) === 0) {
@@ -44,6 +45,7 @@ while (!feof($input)) {
     ['id' => $game, 'plays' => $plays] = $parts;
     $plays = explode(';', $plays);
     $isValid = true;
+    $minimums = ['red'=>0, 'blue'=>0,'green'=>0];
     foreach ($plays as $play) {
         $cubes = [];
         preg_match_all('/(?<red>\d+ red)|(?<blue>\d+ blue)|(?<green>\d+ green)/', $play, $cubes);
@@ -51,19 +53,26 @@ while (!feof($input)) {
             $cubes,
             fn(&$value, $key) => $value = is_numeric($key) ? null : $value
         );
+        $cubes =  array_map(
+            function (array $value) {
+                $value = array_filter($value);
+                return (int) array_pop($value);
+            },
+            array_filter(
+                $cubes
+            )
+        );
+        foreach ($cubes as $color => $number) {
+            $minimums[$color] = max($minimums[$color], $number);
+        }
         $isValid = $isValid && (new Game($game, ...$cubesLoaded))
             ->validate(...
-                array_map(
-                    function (array $value) {
-                        $value = array_filter($value);
-                        return (int) array_pop($value);
-                    },
-                    array_filter(
-                        $cubes
-                    )
-                )
+                $cubes
             );
     }
+
+    $powers[$game] = array_reduce($minimums, fn ($carry, $item) => $carry * $item, 1);
+
     if ($isValid) {
         $valid[] = $game;
     } else {
@@ -76,4 +85,4 @@ $invalid = array_unique($invalid);
 
 echo 'Valid: ' . implode(', ', $valid) . PHP_EOL;
 echo 'Invalid: ' . implode(', ', $invalid) . PHP_EOL;
-echo array_sum($valid) . PHP_EOL;
+echo array_sum($powers) . PHP_EOL;
