@@ -13,15 +13,17 @@ readonly class Card
     public function value(): int
     {
         $matches = $this->matches();
-
-        $value = array_reduce($matches, fn(int $value) => $value * 2, count($matches) > 0 ? 1 : 0) /2;
-        echo "Card {$this->id} has ". count($matches). ' matches for '.$value.PHP_EOL;
-        return $value;
+        return array_reduce($matches, fn(int $value) => $value * 2, count($matches) > 0 ? 1 : 0) / 2;
     }
 
     public function matches(): array
     {
         return array_intersect($this->winning, $this->played);
+    }
+
+    public function awards(): int
+    {
+        return count($this->matches());
     }
 }
 
@@ -39,4 +41,27 @@ while (!feof($input)) {
     );
 }
 
-echo array_reduce($cards, fn(int $carry, Card $current) => $carry + $current->value(), 0) . PHP_EOL;
+$awards = [];
+foreach ($cards as $card) {
+    echo "Card {$card->id} awards {$card->awards()} per copy (";
+    $awards[$card->id] = ($awards[$card->id] ?? 0) + 1;
+    echo "{$awards[$card->id]}).\n";
+    if ($card->awards() > 0) {
+        for ($copy = 1; $copy <= $awards[$card->id]; $copy++) {
+//            echo "\tFor copy {$copy}/{$awards[$card->id]}.\n";
+            for ($awarded = 1; $awarded <= $card->awards(); $awarded++) {
+                $add = $card->id + $awarded;
+//                echo "\t\tOne {$add}.\n";
+                if (!isset($awards[$add])) {
+                    $awards[$add] = 1;
+                    continue;
+                }
+
+                $awards[$add] += 1;
+            }
+        }
+    }
+}
+
+echo array_reduce($awards, fn (int $count, int $awarded) => $count + $awarded, 0) . PHP_EOL;
+echo "YAY!\n";
