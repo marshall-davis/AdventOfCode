@@ -9,13 +9,10 @@ readonly class Race
 }
 
 $races = [
-    new Race(45, 305),
-    new Race(97, 1062),
-    new Race(72, 1110),
-    new Race(95, 1695),
+    new Race(45977295, 305106211101695),
 ];
 
-$winConditions = [0,0,0,0];
+$winConditions = [0,];
 foreach ($races as $id => $race) {
     for ($held = 0; $held <= $race->duration; $held++) {
         $distance = $held * ($race->duration - $held);
