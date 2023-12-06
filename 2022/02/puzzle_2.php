@@ -1,6 +1,7 @@
 <?php
 
-enum Shape: int {
+enum Shape: int
+{
     public const A = self::ROCK;
     public const B = self::PAPER;
     public const C = self::SCISSORS;
@@ -9,18 +10,9 @@ enum Shape: int {
     case PAPER = 2;
     case SCISSORS = 3;
 
-    public function check(self $opponent): ?bool
-    {
-        return match ($opponent) {
-            self::ROCK => $this === self::PAPER ? true : ($this === self::SCISSORS ? false : null),
-            self::PAPER => $this === self::SCISSORS ? true : ($this === self::ROCK ? false : null),
-            self::SCISSORS => $this === self::ROCK ? true : ($this === self::PAPER ? false : null),
-        };
-    }
-
     public static function convert(string $letter): Shape
     {
-        return constant('Shape::'.$letter);
+        return constant('Shape::' . $letter);
     }
 
     public static function isBeatBy(Shape $played): Shape
@@ -40,6 +32,15 @@ enum Shape: int {
             self::SCISSORS => self::PAPER
         };
     }
+
+    public function check(self $opponent): ?bool
+    {
+        return match ($opponent) {
+            self::ROCK => $this === self::PAPER ? true : ($this === self::SCISSORS ? false : null),
+            self::PAPER => $this === self::SCISSORS ? true : ($this === self::ROCK ? false : null),
+            self::SCISSORS => $this === self::ROCK ? true : ($this === self::PAPER ? false : null),
+        };
+    }
 }
 
 $games = fopen('input.txt', 'r');
@@ -50,13 +51,13 @@ while (!feof($games)) {
     if (empty($line)) {
         continue;
     }
-    [$opponent, $player] = array_map('strtoupper',explode(' ', $line));
-    echo "Input: " . $opponent . ' ' . $player.PHP_EOL;
+    [$opponent, $player] = array_map('strtoupper', explode(' ', $line));
+    echo "Input: " . $opponent . ' ' . $player . PHP_EOL;
 
     $opponent = Shape::convert($opponent);
     $player = match ($player) {
-        'X'=> Shape::beats($opponent), // Player Loses
-        'Y'=> $opponent, // Draw
+        'X' => Shape::beats($opponent), // Player Loses
+        'Y' => $opponent, // Draw
         'Z' => Shape::isBeatBy($opponent), // Player Wins
     };
     $points = match ($player->check($opponent)) {
@@ -66,18 +67,18 @@ while (!feof($games)) {
     };
 
     echo implode(' ', [
-        'This round played',
-        implode(' ', [
-            'Opponent:',
-            $opponent->name,
-            'Player:',
-            $player->name
-        ]),
-        $player->value,
-        '+',
+            'This round played',
+            implode(' ', [
+                'Opponent:',
+                $opponent->name,
+                'Player:',
+                $player->name
+            ]),
+            $player->value,
+            '+',
             (string)$points
-    ]).PHP_EOL;
+        ]) . PHP_EOL;
 
     $score += $points + $player->value;
-    echo "Total Score: $score". PHP_EOL;
+    echo "Total Score: $score" . PHP_EOL;
 }

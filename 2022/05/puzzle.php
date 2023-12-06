@@ -2,6 +2,10 @@
 
 class Warehouse
 {
+    public function __construct(private array $floor = [])
+    {
+    }
+
     public static function fromMap(array $map): self
     {
         $warehouse = new self();
@@ -14,10 +18,6 @@ class Warehouse
         }
 
         return $warehouse;
-    }
-
-    public function __construct(private array $floor = [])
-    {
     }
 
     public function store(int $bay, string|array $items): bool

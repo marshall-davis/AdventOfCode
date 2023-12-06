@@ -7,31 +7,31 @@ $elfNumber = 0;
 while (!feof($input)) {
     $line = rtrim(fgets($input), "\r\n");
     if (strlen($line) === 0) {
-        $elves[++$elfNumber]=[];
+        $elves[++$elfNumber] = [];
 
         continue;
     }
 
-    $elves[$elfNumber][]=intval($line);
+    $elves[$elfNumber][] = intval($line);
 }
 
-$elves= array_filter($elves);
+$elves = array_filter($elves);
 
-$totals = array_map(fn (array $inventory) => array_sum($inventory), $elves);
+$totals = array_map(fn(array $inventory) => array_sum($inventory), $elves);
 
 asort($totals);
 
-$strongest=array_key_last($totals);
-$max=$totals[$strongest];
+$strongest = array_key_last($totals);
+$max = $totals[$strongest];
 
 // Part 1
-echo "Maximum Calorie Carried by Elf {$strongest} with {$max}". PHP_EOL;
+echo "Maximum Calorie Carried by Elf {$strongest} with {$max}" . PHP_EOL;
 
-$topThree=0;
+$topThree = 0;
 
-for ($i=0;$i<3;$i++) {
+for ($i = 0; $i < 3; $i++) {
     $topThree += array_pop($totals);
 }
 
 // Part 2
-echo "Total for top three is {$topThree}".PHP_EOL;
+echo "Total for top three is {$topThree}" . PHP_EOL;

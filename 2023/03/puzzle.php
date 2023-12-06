@@ -45,7 +45,7 @@ class Gear
 
     public function ratio(): int
     {
-        return array_reduce($this->sprockets, fn ($carry, $sprocket) => $carry*$sprocket->number, 1);
+        return array_reduce($this->sprockets, fn($carry, $sprocket) => $carry * $sprocket->number, 1);
     }
 }
 
@@ -67,6 +67,13 @@ class Engine
         }
     }
 
+    public function partsList(): array
+    {
+        $this->parsed === true ?: $this->parse();
+
+        return $this->parts;
+    }
+
     private function parse(): void
     {
         $partStart = null;
@@ -75,7 +82,7 @@ class Engine
                 if (is_numeric($character)) {
                     $partStart ??= $offset;
                 } elseif ($partStart !== null) {
-                    if ($part = $this->isPart($line, $partStart, $offset - $partStart)){
+                    if ($part = $this->isPart($line, $partStart, $offset - $partStart)) {
                         $this->parts[] = $part;
                         $part = null;
                     }
@@ -98,13 +105,13 @@ class Engine
 
         $this->parts = array_filter($this->parts);
         foreach ($this->gears as $gear) {
-           foreach ($this->parts as $part) {
-               if ($part->touches($gear)) {
-                   $gear->attach($part);
-               }
-           }
+            foreach ($this->parts as $part) {
+                if ($part->touches($gear)) {
+                    $gear->attach($part);
+                }
+            }
         }
-        $this->gears = array_filter($this->gears, fn (Gear $gear) => count($gear->sprockets) === 2);
+        $this->gears = array_filter($this->gears, fn(Gear $gear) => count($gear->sprockets) === 2);
         $this->parsed = true;
     }
 
@@ -131,13 +138,6 @@ class Engine
         return false;
     }
 
-    public function partsList(): array
-    {
-        $this->parsed === true ?: $this->parse();
-
-        return $this->parts;
-    }
-
     public function gears(): array
     {
         return $this->gears;
@@ -147,4 +147,4 @@ class Engine
 $engine = new Engine('input.txt');
 assert(539713 === array_reduce($engine->partsList(), fn($carry, $item) => $carry + $item->number));
 
-echo array_reduce($engine->gears(), fn ($carry, $gear) => $carry+$gear->ratio(), 0). PHP_EOL;
+echo array_reduce($engine->gears(), fn($carry, $gear) => $carry + $gear->ratio(), 0) . PHP_EOL;

@@ -45,7 +45,7 @@ while (!feof($input)) {
     ['id' => $game, 'plays' => $plays] = $parts;
     $plays = explode(';', $plays);
     $isValid = true;
-    $minimums = ['red'=>0, 'blue'=>0,'green'=>0];
+    $minimums = ['red' => 0, 'blue' => 0, 'green' => 0];
     foreach ($plays as $play) {
         $cubes = [];
         preg_match_all('/(?<red>\d+ red)|(?<blue>\d+ blue)|(?<green>\d+ green)/', $play, $cubes);
@@ -53,10 +53,10 @@ while (!feof($input)) {
             $cubes,
             fn(&$value, $key) => $value = is_numeric($key) ? null : $value
         );
-        $cubes =  array_map(
+        $cubes = array_map(
             function (array $value) {
                 $value = array_filter($value);
-                return (int) array_pop($value);
+                return (int)array_pop($value);
             },
             array_filter(
                 $cubes
@@ -66,12 +66,12 @@ while (!feof($input)) {
             $minimums[$color] = max($minimums[$color], $number);
         }
         $isValid = $isValid && (new Game($game, ...$cubesLoaded))
-            ->validate(...
-                $cubes
-            );
+                ->validate(...
+                    $cubes
+                );
     }
 
-    $powers[$game] = array_reduce($minimums, fn ($carry, $item) => $carry * $item, 1);
+    $powers[$game] = array_reduce($minimums, fn($carry, $item) => $carry * $item, 1);
 
     if ($isValid) {
         $valid[] = $game;

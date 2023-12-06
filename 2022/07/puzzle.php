@@ -1,5 +1,15 @@
 <?php
 
+trait Linked
+{
+    private readonly ?Dir $parent;
+
+    public function parent(): ?Dir
+    {
+        return $this->parent;
+    }
+}
+
 interface Node
 {
     public function size(): int;
@@ -11,24 +21,14 @@ interface Node
     public function parent(): ?Dir;
 }
 
-trait Linked
-{
-    private readonly ?Dir $parent;
-
-    public function parent(): ?Dir
-    {
-        return $this->parent;
-    }
-}
-
 class File implements Node
 {
     use Linked;
 
     public function __construct(
         private readonly string $name,
-        private readonly ?int    $size,
-        private readonly ?Dir $parent
+        private readonly ?int   $size,
+        private readonly ?Dir   $parent
     )
     {
     }
@@ -55,15 +55,10 @@ class Dir implements Node
 
     public function __construct(
         private readonly string $name,
-        private readonly ?Dir $parent,
-        private array  $contents = []
+        private readonly ?Dir   $parent,
+        private array           $contents = []
     )
     {
-    }
-
-    public function name(): string
-    {
-        return $this->name;
     }
 
     public function retrieve(string $name): ?Node
@@ -76,6 +71,11 @@ class Dir implements Node
         $this->contents[$node->name()] = $node;
 
         return $node;
+    }
+
+    public function name(): string
+    {
+        return $this->name;
     }
 
     public function contents(): array
@@ -100,7 +100,7 @@ class Disk
 
     public function __construct()
     {
-        $this->root = new Dir('/',null);
+        $this->root = new Dir('/', null);
     }
 }
 
@@ -124,11 +124,6 @@ class Filesystem
         };
 
         echo "New working path {$to}\n";
-    }
-
-    public function list(): void
-    {
-        echo "Listing" . implode("\n\t", $this->currentWorkingPath->contents()) . PHP_EOL;
     }
 
     protected function traverseUp(): void
@@ -156,6 +151,11 @@ class Filesystem
         $this->currentWorkingPath = $newt ?? $this->currentWorkingPath->store(new Dir($to, $this->currentWorkingPath));
     }
 
+    public function list(): void
+    {
+        echo "Listing" . implode("\n\t", $this->currentWorkingPath->contents()) . PHP_EOL;
+    }
+
     public function touch(string $name, ?int $size = null): void
     {
         echo "Creating file {$name}\n";
@@ -177,7 +177,7 @@ class Filesystem
         foreach ($directory->contents() as $node) {
             if ($node->isDir()) {
                 /** @noinspection PhpParamsInspection */
-                $results = $results+$this->find($filter, $node);
+                $results = $results + $this->find($filter, $node);
             }
 
             if ($filter($node)) {
@@ -217,4 +217,4 @@ while (!feof($log)) {
     $fs->mkdir($name);
 }
 
-$results = $fs->find(fn(Node $node)=> $node->isDir() && $node->size() >= 10000);
+$results = $fs->find(fn(Node $node) => $node->isDir() && $node->size() >= 10000);

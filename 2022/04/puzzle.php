@@ -44,7 +44,7 @@ while (!feof($input)) {
 
 $overlapping = array_reduce(
     $pairs,
-    fn ($total, $pair) => $pair[0]->overlaps($pair[1]) || $pair[1]->overlaps($pair[0]) ? ++$total : $total,
+    fn($total, $pair) => $pair[0]->overlaps($pair[1]) || $pair[1]->overlaps($pair[0]) ? ++$total : $total,
     0
 );
 
@@ -54,5 +54,5 @@ $enclosed = array_reduce(
     0
 ) ?? 'WTF';
 
-echo "Total overlapping: {$overlapping}.".PHP_EOL;
-echo "Total enclosed: {$enclosed}.".PHP_EOL;
+echo "Total overlapping: {$overlapping}." . PHP_EOL;
+echo "Total enclosed: {$enclosed}." . PHP_EOL;
