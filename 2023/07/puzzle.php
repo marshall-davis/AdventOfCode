@@ -1,17 +1,58 @@
 <?php
 
+readonly class Card
+{
+    public function __construct(public string $face)
+    {
+    }
+
+    public function value(): int
+    {
+        $faces = ['T' => 10, 'J' => 1, 'Q' => 12, 'K' => 13, 'A' => 14];
+        return is_numeric($this->face) ? $this->face : $faces[$this->face];
+    }
+}
+
 readonly class Hand
 {
     private array $cards;
 
     public function __construct(string $cards, public int $bid)
     {
-        $this->cards = str_split($cards);
+        $this->cards = array_map(fn(string $face) => new Card($face), str_split($cards));
     }
 
     public function type(): int
     {
-        $sets = array_count_values($this->cards);
+        $sets = array_count_values(array_map(fn(Card $c) => $c->face, $this->cards));
+
+        if (count($sets) > 1 && array_key_exists('J', $sets)) {
+            $biggestSet = max($sets);
+            $bigs = array_keys(array_filter($sets, fn(int $n) => $n === $biggestSet));
+            $jacks = $sets['J'];
+            unset($sets['J']);
+            assert($jacks + array_sum($sets) === 5);
+            if (in_array('A', $bigs)) {
+                $sets['A'] += $jacks;
+            } elseif (in_array('K', $bigs)) {
+                $sets['K'] += $jacks;
+            } elseif (in_array('Q', $bigs)) {
+                $sets['Q'] += $jacks;
+            } elseif (in_array('T', $bigs)) {
+                $sets['T'] += $jacks;
+            } else {
+                $bigs = array_filter($bigs, fn($c) => is_numeric($c));
+                sort($bigs);
+                $backups = array_keys($sets);
+                sort($backups);
+                $addingTo = array_pop($bigs) ?? array_pop($backups);
+                if ($addingTo === 'J') {
+                    $sets['J'] = $jacks;
+                } else {
+                    $sets[$addingTo] += $jacks;
+                }
+            }
+        }
 
         return match (count($sets)) {
             1 => 7, // Five of a kind.
@@ -25,25 +66,36 @@ readonly class Hand
     public function beats(Hand $opponent): bool
     {
         if ($this->type() > $opponent->type()) {
+            echo "$this beats $opponent\n";
             return true;
         }
 
         if ($this->type() < $opponent->type()) {
+            echo "$this loses to $opponent\n";
             return false;
         }
 
         foreach ($this->cards as $position => $card) {
-            $card = is_numeric($card) ? $card : ['T'=>10,'J'=>11,'Q'=>12,'K'=>13,'A'=>14][$card];
-            $opposed = is_numeric($opponent->cards[$position]) ? $opponent->cards[$position] : ['T'=>10,'J'=>11,'Q'=>12,'K'=>13,'A'=>14][$opponent->cards[$position]];
+
+            $card = $card->value();
+            $opposed = $opponent->cards[$position]->value();
             if ($card > $opposed) {
+                echo "$this beats $opponent\n";
                 return true;
             }
             if ($card < $opposed) {
+                echo "$this loses to $opponent\n";
                 return false;
             }
         }
 
+        echo "$this loses to $opponent\n";
         return false;
+    }
+
+    function __toString(): string
+    {
+        return implode('', array_map(fn(Card $c)=>$c->face,$this->cards));
     }
 }
 
