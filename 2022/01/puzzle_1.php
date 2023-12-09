@@ -1,6 +1,6 @@
 <?php
 
-$input = fopen('puzzle_1_input.txt', 'r');
+$input = fopen('input.txt', 'r');
 $elves = [[]];
 $elfNumber = 0;
 
