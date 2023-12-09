@@ -1,12 +1,14 @@
 <?php
 
-class Node {
+class Node
+{
     public function __construct(
         public readonly string $name,
-        public ?Node $left = null,
-        public ?Node $right = null
+        public ?Node           $left = null,
+        public ?Node           $right = null
     )
-    {}
+    {
+    }
 
     public function attach(string $direction, Node $node): self
     {
@@ -17,7 +19,7 @@ class Node {
 
     public function __toString(): string
     {
-        return "{$this->name} goes left to {$this->left->name} and right to {$this->right->name}.\n";
+        return $this->name;
     }
 }
 
@@ -29,6 +31,7 @@ fgets($input);
 
 // Now we build our network.
 echo "Building nodes...\n";
+$paths = [];
 while (!feof($input)) {
     $definition = trim(fgets($input));
 
@@ -43,24 +46,36 @@ while (!feof($input)) {
         $$nodeName ??= new Node($nodeName);
     }
     ${$parts['name']}->attach('left', ${$parts['left']})->attach('right', ${$parts['right']});
+    if (str_ends_with($parts['name'], 'A')) {
+        $paths[$parts['name']] = ${$parts['name']};
+    }
 }
+assert(count($paths) === 6); // Counted from input.
 assert(isset($ZZZ));
 echo "Network complete.\n";
-$currentNode = $AAA;
-$steps = 0;
-while ($currentNode->name !== 'ZZZ') {
-    foreach ($instructions as $direction) {
-        $previousNode = $currentNode;
-        $currentNode = $direction === 'R' ? $currentNode->right : $currentNode->left;
-        echo "Moving {$direction} from {$previousNode->name} to {$currentNode->name}\n";
-        $steps++;
-        if ($currentNode->name === 'ZZZ') {
-            echo "Made it to ZZZ!\n";
-            break;
+
+$reachedDestination = false;
+foreach ($paths as $path => $pathNode) {
+    echo "Tracing path {$path}.\n";
+    $steps = 0;
+    $reachedDestination = false;
+    while (!$reachedDestination) {
+        foreach ($instructions as $direction) {
+            ++$steps;
+            $pathNode = $direction === 'R' ? $pathNode->right : $pathNode->left;
+            if (str_ends_with($pathNode->name, 'Z')) {
+                echo "{$path} has {$steps} steps.\n";
+                $paths[$path] = $steps;
+                $reachedDestination = true;
+                break;
+            }
         }
     }
 }
-assert($currentNode->name === 'ZZZ');
-assert($steps > 293);
-assert($steps < 13772);
-echo "Steps: {$steps}\n";
+echo 'Convergence at ' . array_reduce(
+    $paths,
+    fn (int|GMP $firstFactor, int $secondFactor) => gmp_lcm($firstFactor, $secondFactor),
+        $paths[array_key_first($paths)]
+    );
+echo PHP_EOL;
+exit;
