@@ -1,32 +1,17 @@
 <?php
 
+const MULTIPLIER = 1000000;
 $map = file('input.txt', FILE_SKIP_EMPTY_LINES | FILE_IGNORE_NEW_LINES);
-//$map = [
-//'...#......',
-//'.......#..',
-//'#.........',
-//'..........',
-//'......#...',
-//'.#........',
-//'.........#',
-//'..........',
-//'.......#..',
-//'#...#.....',
-//];
-$expanded = 0;
+$expanded = ['rows' => [], 'columns' => []];
 foreach ($map as $index => $line) {
     if (!str_contains($line, '#')) {
-        echo "Expand Vertically from {$index}!\n";
-        array_splice($map, $index + ++$expanded, 0, str_pad('', strlen($line), '.'));
+        $expanded['rows'][] = $index;
     }
 }
 $map = array_map(fn(string $line) => str_split($line), $map);
-$expanded = 0;
 for ($column = 0; $column < count($map[0]); $column++) {
     if (!in_array('#', array_column($map, $column))) {
-        echo "Expand Horizontally!\n";
-        array_walk($map, fn (array &$line) => array_splice($line, $column + ++$expanded, 0, ['.']));
-        $column++;
+        $expanded['columns'][] = $column;
     }
 }
 
@@ -42,10 +27,31 @@ foreach ($map as $line => $content) {
 $distances = [];
 foreach ($galaxies as $location) {
     foreach ($galaxies as $destination) {
-        $distances[] = $d = abs($location[0] - $destination[0]) + abs($location[1] - $destination[1]);
+        $verticalDistance = $destination[0] - $location[0];
+        $horizontalDistance = $destination[1] - $location[1];
+        /**
+         * Add vertical multipliers by counting how many exist in the slice of the column.
+         */
+        $column = array_column($map, $location[1]);
+        $columnSlice = array_slice($column, min($destination[0], $location[0]), abs($verticalDistance), true);
+        $expandedRows = array_intersect(array_keys($columnSlice), $expanded['rows']);
+        $verticalDistance = abs($verticalDistance) + ((count($expandedRows) * MULTIPLIER));
+        /**
+         * Add horizontal multipliers by counting how many exist in the slice of the row.
+         */
+        $row = $map[$location[0]];
+        $rowSlice = array_slice($row, min($destination[1], $location[1]), abs($horizontalDistance), true);
+        $expandedColumns = array_intersect(array_keys($rowSlice), $expanded['columns']);
+        $horizontalDistance = abs($horizontalDistance) + ((count($expandedColumns) * MULTIPLIER));
+
+        $distances[] = abs($verticalDistance) + abs($horizontalDistance) - count($expandedRows) - count($expandedColumns);
     }
 }
-
+echo count($galaxies) . " galaxies\n";
+echo count($distances) . " distances.\n";
+assert(count($galaxies)*count($galaxies) === count($distances));
+echo "Expanded rows: ". implode(', ', $expanded['rows']).PHP_EOL;
+echo "Expanded columns: ". implode(', ', $expanded['columns']).PHP_EOL;
 $d = array_sum($distances) / 2;
-assert($d < 10772649);
+assert($d == 483844716556);
 echo "$d\n";
