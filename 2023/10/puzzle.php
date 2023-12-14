@@ -13,6 +13,11 @@ class Location
     {
     }
 
+    public function key(): string
+    {
+        return $this::KEY;
+    }
+
     public function __toString(): string
     {
         return $this::KEY . ' at (' . $this->row . ', ' . $this->column . ')';
@@ -104,6 +109,14 @@ class DownLeft extends Location
     }
 }
 
+class Open extends Location {
+    public const KEY = 'O';
+}
+
+class Enclosed extends Location{
+    public const KEY = 'I';
+}
+
 class DownRight extends Location
 {
     public const KEY = 'F';
@@ -129,6 +142,10 @@ class Map
     /** @var array<Location> */
     private array $locations = [];
     public readonly Location $start;
+
+    private array $loop = [];
+
+    private array $bounded = [];
 
     public function __construct(string $input)
     {
@@ -171,20 +188,95 @@ class Map
 
     public function findLoop(): array
     {
-        $loop = [$this->start];
+        $this->loop = [$this->start];
 
         do {
             foreach (['up', 'down', 'left', 'right'] as $direction) {
-                $attempt = $loop[array_key_last($loop)]->$direction;
-                if ($attempt && $attempt !== $loop[array_key_last($loop)-1]?? null) {
-                    echo "Moving {$direction}.\n";
-                    $loop[] = $attempt;
+                $attempt = $this->loop[array_key_last($this->loop)]->$direction;
+                if ($attempt && $attempt !== ($this->loop[array_key_last($this->loop)-1]?? null)) {
+                    $this->loop[] = $attempt;
                     break;
                 }
             }
-        } while ($loop[array_key_last($loop)] !== $this->start);
+        } while ($this->loop[array_key_last($this->loop)] !== $this->start);
 
-        return $loop;
+        return $this->loop;
+    }
+
+
+    public function bounded(): array
+    {
+        foreach ($this->locations as $row) {
+            foreach ($row as $location) {
+                $blockLeft = false;
+                $blockRight= false;
+                $blockUp = false;
+                $blockDown = false;
+                if ($location::KEY !== '.') {
+                    continue;
+                }
+
+                // Check vertically
+                for ($offset = 0; $offset < count($this->locations); $offset++) {
+                    $toDown = $this->at($location->row + $offset, $location->column);
+                    if ($toDown?->key() === 'O') {
+                        $this->locations[$location->row][$location->column] = new Open($location->row, $location->column);
+                        continue 2;
+                    }
+                    if (in_array($toDown, $this->loop) && $toDown?->left && $toDown?->right) {
+                        $blockDown = true;
+                    }
+                    $toUp = $this->at($location->row - $offset, $location->column);
+                    if ($toUp?->key() === 'O') {
+                        echo "FREEDOM!\n";
+                        $this->locations[$location->row][$location->column] = new Open($location->row, $location->column);
+                        continue 2;
+                    }
+                    if (in_array($toUp, $this->loop) && $toUp?->left && $toUp?->right) {
+                        $blockUp = true;
+                    }
+                }
+
+                // Check horizontally
+                for ($offset = 0; $offset < count($this->locations); $offset++) {
+                    $toLeft = $this->at($location->row, $location->column - $offset);
+                    if ($toLeft?->key() === 'O') {
+                        $this->locations[$location->row][$location->column] = new Open($location->row, $location->column);
+                        continue 2;
+                    }
+                    if ($toLeft?->up && $toLeft?->down) {
+                        $blockLeft = true;
+                    }
+                    $toRight = $this->at($location->row, $location->column+$offset);
+                    if ($toRight?->key() === 'O') {
+                        $this->locations[$location->row][$location->column] = new Open($location->row, $location->column);
+                        continue 2;
+                    }
+                    if ($toRight?->up && $toRight?->down) {
+                        $blockRight = true;
+                    }
+                }
+
+                if ($blockDown && $blockUp && $blockRight && $blockLeft) {
+                    $this->bounded[] = $this->locations[$location->row][$location->column] = new Enclosed($location->row, $location->column);
+                }
+            }
+        }
+
+        return $this->bounded;
+    }
+
+    public function visualize(): string
+    {
+        $image = array_pad([], 140, array_pad([], 140, ' '));
+        foreach ($this->loop as $location) {
+            $image[$location->row][$location->column] = $location::KEY;
+        }
+        foreach ($this->bounded as $bounded) {
+            $image[$bounded->row][$bounded->column] = $bounded::KEY;
+        }
+
+        return implode('', array_map(fn (array $row) => implode('', $row) . "\n",$image));
     }
 
     public function at(int $row, int $column): ?Location
@@ -200,3 +292,6 @@ $loop = $map->link()->findLoop();
 echo count($loop) . ' steps.'.PHP_EOL;
 
 echo 'Thing at: ' .(count($loop)-1)/2 . PHP_EOL;
+
+echo 'Bounds ' . count($map->bounded()).PHP_EOL;
+echo $map->visualize();
