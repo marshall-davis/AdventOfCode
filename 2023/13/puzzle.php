@@ -9,14 +9,14 @@ while (($separator = array_search('', $contents)) !== false) {
 }
 $patterns[] = array_map(str_split(...),$contents);
 unset($contents);
-$score = 0;
+$scores = 0;
 
 class Map {
     public function __construct(private readonly array $map) {
 
     }
 
-    public function verticalReflection(): int|false
+    public function verticalReflection(int $ignore = null): int|false
     {
         $width = count($this->map[0]);
 
@@ -35,8 +35,18 @@ class Map {
                 array_shift($left);
             }
 
-            if (!empty($left) && !empty($right) && array_reverse($left) == $right) {
+            if (empty($left) || empty($right)) {
+                return false;
+            }
+
+            if (array_reverse($left) == $right) {
                 echo "Reflected vertically at $i\n";
+                if ($ignore === null || $ignore !== $i) {
+                    return ++$i;
+                }
+            }
+
+            if ($ignore !== null && $this->repair(array_reverse($left), $right)) {
                 return ++$i;
             }
         }
@@ -44,7 +54,23 @@ class Map {
         return false;
     }
 
-    public function horizontalReflection(): int|false
+    public function repair(array $left, array $right): bool {
+        foreach ($left as $row => $line) {
+            foreach ($line as $column => $character) {
+                $clone = $left;
+                $clone[$row][$column] = $character === '.' ? '#' : '.';
+
+                if ($clone == $right) {
+                    echo "Repaired ({$row},$column) to {$clone[$row][$column]}\n";
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public function horizontalReflection(int $ignore = null): int|false
     {
         $height = count($this->map);
 
@@ -63,14 +89,14 @@ class Map {
                 array_shift($top);
             }
 
-            foreach(array_map(fn (array $piece) => implode('', $piece), $top) as $line) {echo "$line\n";}
-            echo "----------------\n";
-            foreach(array_map(fn (array $piece) => implode('', $piece), $bottom) as $line) {echo "$line\n";}
-            echo "\n\n";
-
-
             if ($top == array_reverse($bottom)) {
                 echo "Reflected horizontally at $i\n";
+                if ($ignore === null || $ignore !== $i) {
+                    return ++$i;
+                }
+            }
+
+            if ($ignore !== null && $this->repair($top, array_reverse($bottom))) {
                 return ++$i;
             }
         }
@@ -80,11 +106,11 @@ class Map {
 
     public function score(): int
     {
-        if ($vertical = $this->verticalReflection()) {
-            return $vertical;
+        if ($vertical = $this->verticalReflection($this->verticalReflection() -1)) {
+                return $vertical;
         }
 
-        return 100 * $this->horizontalReflection();
+        return 100 * $this->horizontalReflection($this->horizontalReflection()-1);
     }
 }
 
