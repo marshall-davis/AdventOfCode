@@ -23,7 +23,6 @@ class Location
     public function crossedBy(Beam $beam): static
     {
         if (in_array($beam::class, $this->beams)) {
-            echo "Repeated beam traversal of {$this->coordinate} going ".$beam::class."\n";
             $beam->terminate();
         }
 
@@ -58,7 +57,6 @@ abstract class Beam
 
     public function terminate(): static
     {
-        echo "Terminating a beam at {$this->coordinate}.\n";
         $this->terminated = true;
 
         return $this;
@@ -149,16 +147,22 @@ class Contraption
     private array $beams = [];
     private array $map = [];
 
-    public function __construct(array $map)
+    public function __construct(private readonly string $path)
     {
+        $this->remap();
+    }
+
+    private function remap(): void
+    {
+        $input = file($this->path, FILE_SKIP_EMPTY_LINES | FILE_IGNORE_NEW_LINES);
         $this->map = array_map(
             fn(string $row, int $x) => array_map(
                 fn(string $character, int $y) => new Location(new Coordinate($x, $y), $character),
                 str_split($row),
                 array_keys(str_split($row))
             ),
-            $map,
-            array_keys($map)
+            $input,
+            array_keys($input)
         );
     }
 
@@ -209,14 +213,35 @@ class Contraption
                     },
                 }
             );
-            echo 'Now charged: ' . $this->totalCharged() . "\n";
         } while (array_reduce($this->beams, fn(bool $untraced, Beam $beam) => $untraced || ($beam->isTerminated() === false), false));
         return $this;
     }
 
-    public function totalCharged(): int
+    public function maximumCharge(): int
     {
-        return array_reduce(
+        $charges = [];
+        $fired = 1;
+        $totalFirings = count($this->map) * 2 + count($this->map[0]) * 2;
+        echo "Firing {$totalFirings} times.\n";
+        for ($row = 0;$row<count($this->map);$row++) {
+            echo "Fire ".$fired++." of {$totalFirings}\n";
+            $charges[] =  $this->fire(new Right(new Coordinate($row, -1)))->totalCharged(true);
+            echo "Fire ".$fired++." of {$totalFirings}\n";
+            $charges[] =  $this->fire(new Left(new Coordinate($row, count($this->map[$row]))))->totalCharged(true);
+        }
+        for ($column = 0;$column<count($this->map[0]);$column++) {
+            echo "Fire ".$fired++." of {$totalFirings}\n";
+            $charges[] =  $this->fire(new Down(new Coordinate(-1, $column)))->totalCharged(true);
+            echo "Fire ".$fired++." of {$totalFirings}\n";
+            $charges[] =  $this->fire(new Up(new Coordinate(count($this->map), $column)))->totalCharged(true);
+        }
+
+        return max($charges);
+    }
+
+    public function totalCharged(bool $remap = false): int
+    {
+        $charge = array_reduce(
             $this->map,
             fn(int $charged, array $row) => $charged + array_reduce(
                     $row,
@@ -225,9 +250,15 @@ class Contraption
                 ),
             0
         );
+
+        if ($remap) {
+            $this->remap();
+        }
+
+        return $charge;
     }
 }
 
-$contraption = (new Contraption(file('full.txt', FILE_SKIP_EMPTY_LINES | FILE_IGNORE_NEW_LINES)))->fire(new Right(new Coordinate(0, -1)));
+$contraption = new Contraption('full.txt');
 
-echo "Total charged " . $contraption->totalCharged() . PHP_EOL;
+echo "Max charged " . $contraption->maximumCharge() . PHP_EOL;
