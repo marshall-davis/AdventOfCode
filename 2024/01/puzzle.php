@@ -8,14 +8,13 @@ while(!feof($input)) {
     preg_match('/(\d+) {3}(\d+)/', trim(fgets($input)), $matches);
     $left[] = $matches[1];
     $right[] = $matches[2];
-};
+}
 
-sort($left);
-sort($right);
-
-$sum = 0;
-for ($i = 0; $i < count($left); $i++) {
-    $sum += abs($left[$i]-$right[$i]);
+$sum=0;
+foreach ($left as $leftValue) {
+    $arr =array_filter($right, fn (string $target) => $target===$leftValue);
+    $multiplier = count($arr);
+    $sum += $leftValue * $multiplier;
 }
 
 echo PHP_EOL.PHP_EOL.$sum.PHP_EOL;
