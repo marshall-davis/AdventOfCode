@@ -33,23 +33,44 @@ while (!feof($input)) {
 }
 
 $correct = [];
+$wrong = [];
 $sum =0;
 while (!feof($input)) {
     $update = trim(fgets($input));
     /** @var Rule $rule */
     foreach ($rules as $rule) {
         if (!$rule->matches($update)) {
-            echo "$update did not match $rule\n";
+            $wrong[] = $update;
+
             continue 2;
         }
     }
-    echo "$update is correct\n";
-    $correct[] = $update;
-    $updateArray = explode(",", $update);
-    $added = (int)$updateArray[intval(count($updateArray)/2)];
-    echo 'Adding ' . $added . "\n";
-    $sum += $added;
-
 }
-echo print_r($correct, true).PHP_EOL;
+
+function fix(array &$update, array $rules): void
+{
+    do {
+        $changes = false;
+        foreach ($rules as $rule) {
+            if (!$rule->matches(implode(',', $update))) {
+                $second = array_search($rule->second, $update);
+                $first = array_search($rule->first, $update);
+
+                $update[$first] = $rule->second;
+                $update[$second] = $rule->first;
+                $changes = true;
+            }
+        }
+    } while ($changes);
+}
+
+foreach ($wrong as $update) {
+    $update = explode(',', $update);
+    fix($update, $rules);
+
+    $sum +=(int)$update[intval(count($update)/2)];
+}
+
+assert($sum < 5423);
+
 echo $sum.PHP_EOL;
