@@ -4,11 +4,11 @@ $input = fopen('input.txt', 'r+');
 
 $sum = 0;
 
-function buildOperators(array $operators,int $length, ?array $list = null): array
+function buildOperators(array $operators, int $length, ?array $list = null): array
 {
     $list ??= $operators;
 
-    if ($length < 1) {
+    if ($length == 1) {
         return $list;
     }
 
@@ -19,45 +19,75 @@ function buildOperators(array $operators,int $length, ?array $list = null): arra
         }
     }
 
-    return buildOperators($operators,$length-1,$additional);
+    return buildOperators($operators, $length - 1, $additional);
 }
 
 
 function check(int $goal, array $operators, array $operands): int
 {
-    foreach ($operators as $operatorPattern) {
-        $result = 0;
-        foreach ($operands as $position => $operand) {
-            if ($position === 0) {
-                $result = $operand;
-                continue;
-            }
-            $result = match ($operatorPattern[$position - 1]) {
-                '+' => $result + $operand,
-                '*' => $result * $operand,
-                default => throw new RuntimeException("Unexpected operator '$operatorPattern[$position]'"),
+    $operatorsIterator = new ArrayIterator($operators);
+    $operandIterator = new ArrayIterator($operands);
+
+    while ($operatorsIterator->valid()) {
+        echo "Let's try ". $operatorsIterator->current().PHP_EOL;
+        $operandIterator->rewind();
+        $operatorIterator = new ArrayIterator(str_split($operatorsIterator->current()));
+        $result = $operandIterator->current();
+        while ($operatorIterator->valid()) {
+            $operandIterator->next();
+            match ($operatorIterator->current()) {
+                '+' => function () use (&$result, $operandIterator) {
+                    // Add the current operand to the next.
+                    $result += $operandIterator->current();
+                    // That was used, so move on
+                    $operandIterator->next();
+                },
+                '|' => function () use (&$result, $operandIterator) {
+                    // This is the tricky one.
+                    // The current operand is set to a concatenation of it and the next.
+                    $current = $operandIterator->current();
+                    $operandIterator->next();
+                    $current .= $operandIterator->current();
+                    $operandIterator->offsetSet($operandIterator->key(), $current);
+                    // The current value is correct, no need to advance the pointer
+                },
+                '*' => function () use (&$result, $operandIterator) {
+                    // Add the current operand to the next.
+                    $result *= $operandIterator->current();
+                    // That was used, so move on
+                    $operandIterator->next();
+                }
             };
 
+            // Alright, deal with the next problem.
+            $operatorIterator->next();
 
+            if ($result == $goal) {
+                echo "Got one! $result\n";
+                return $result;
+            } else {
+                echo "$result is not $goal! \n";
+            }
         }
 
-        if ($result == $goal) {
-            echo "Got one! $result\n";
-            return $result;
-        }
+        // Next set of problems
+        $operatorsIterator->next();
     }
 
     return 0;
 }
 
-$iteration=1;
 while (!feof($input)) {
-    echo 'Parsing line ' . $iteration++.PHP_EOL;
     $line = explode(':', fgets($input));
     $target = $line[0];
     $operands = explode(' ', trim($line[1]));
 
-    $sum += check($target, buildOperators(['+','*'], count($operands)-1), $operands);
+    $sum += check($target, array_filter(buildOperators(['+', '*', '|'], count($operands) - 1),
+        fn(string $ops) => str_ends_with($ops, '|') === false), $operands);
+
+    echo "TICK!\n\n";
 }
+
+assert($sum > 2002330);
 
 echo "$sum\n";
