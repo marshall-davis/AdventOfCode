@@ -8,7 +8,7 @@ readonly class Coordinate implements Stringable
 
     public function distanceTo(Coordinate $destination): int
     {
-        return (int)sqrt(abs(pow($destination->column - $this->column, 2) + pow($destination->row - $this->row, 2)));
+        return (int) sqrt(abs(pow($destination->column - $this->column, 2) + pow($destination->row - $this->row, 2)));
     }
 
     public function __toString(): string
@@ -17,6 +17,9 @@ readonly class Coordinate implements Stringable
     }
 }
 
+/**
+ * @mixin Coordinate
+ */
 class Antenna implements Stringable
 {
     public function __construct(public Coordinate $coordinate, public string $frequency, public bool $paired = false)
@@ -52,13 +55,23 @@ class Antenna implements Stringable
     }
 }
 
+/**
+ * @mixin Coordinate
+ */
 class AntiNode implements Stringable
 {
-    public function __construct(public readonly Coordinate $coordinate, private array $frequencies = []){}
-
-    public function broadcasts(string $frequency): self
+    public function __construct(public readonly Coordinate $coordinate, private array $frequencies = [])
     {
-        $this->frequencies[] = $frequency;
+        $this->frequencies = array_unique($this->frequencies);
+    }
+
+    public function broadcasts(array|string $frequency): self
+    {
+        if (is_string($frequency)) {
+            $frequency = [$frequency];
+        }
+        $this->frequencies = array_merge($this->frequencies, $frequency);
+        $this->frequencies = array_unique($this->frequencies);
         return $this;
     }
 
@@ -67,34 +80,66 @@ class AntiNode implements Stringable
         return in_array($frequency, $this->frequencies);
     }
 
+    public function broadcasting(): array
+    {
+        return $this->frequencies;
+    }
+
     public function __toString(): string
     {
         return $this->coordinate;
     }
+
+    public function __get(string $name)
+    {
+        if (property_exists($this->coordinate, $name)) {
+            return $this->coordinate->$name;
+        }
+
+        return null;
+    }
+
+    public function __call(string $name, array $arguments)
+    {
+        if (method_exists($this->coordinate, $name)) {
+            return call_user_func_array([$this->coordinate, $name], $arguments);
+        }
+
+        throw new BadMethodCallException();
+    }
 }
 
-class Map
+class Map implements Stringable
 {
     public array $antennas = [];
     public array $antinodes = [];
 
     public function __construct(private array $grid)
     {
+        $this->findAntennas()->findAntinodes();
     }
 
-    public function visualize()
+    public function __toString(): string
     {
+        return $this->visualize();
+    }
+
+    public function visualize(): string
+    {
+        $representation = '';
         foreach ($this->grid as $row) {
             foreach ($row as $cell) {
-                echo $cell;
+                $representation .= $cell === '.' ? ' ' : $cell;
             }
-            echo "\n";
+            $representation.="\n";
         }
+
+        return $representation;
     }
 
-    // Should accept a closure
-    public function transform(): self
+    private function findAntennas(): self
     {
+        echo "Discovering antennas.\n";
         foreach ($this->grid as $y => $row) {
             foreach ($row as $x => $cell) {
                 if ($cell !== '.') { // dot character should be configurable
@@ -116,137 +161,82 @@ class Map
     }
 
     // Specific to puzzle, maybe macros?
-    public function antiNodes(Antenna $antenna): int
+    private function findAntinodes(): self
     {
-        $antiNodes = 0;
-        // Could generalize this row/column, get all possible pair locations and compare
-        $seCoords = [];
-        $position = $antenna;
-        $onGrid = true;
-        while($onGrid) {
-            $position = new Coordinate($position->row+1, $position->column+1);
-            if (!$this->contains($position)) {
-                break;
-            }
-
-        }
-        $swCoords = [];
-        $position = $antenna;
-        do {
-            $position = new Coordinate($position->row+1, $position->column-1);
-            if ($contained = $this->contains($position)) {
-                $swCoords[] = $position;
-            }
-        } while ($contained);
-        $neCoords = [];
-        $position = $antenna;
-        do {
-            $position = new Coordinate($position->row-1, $position->column+1);
-            if ($contained = $this->contains($position)) {
-                $neCoords[] = $position;
-            }
-        } while ($contained);
-        $nwCoords = [];
-        $position = $antenna;
-        do {
-            $position = new Coordinate($position->row-1, $position->column-1);
-            if ($contained = $this->contains($position)) {
-                $nwCoords[] = $position;
-            }
-        } while ($contained);
-        /** @var Antenna $node */
-        foreach (array_filter($this->antennas, fn(Antenna $node) => !$node->paired) as $node) {
-            if ($node->coordinate->row === $antenna->coordinate->row) {
-                $nodeDistance = $antenna->coordinate->distanceTo($node->coordinate);
-                if ($nodeDistance === 0) {
-                    // Same node
-                    continue;
+        echo "Discovering antinodes.\n";
+        /** @var Antenna $originator */
+        foreach ($this->antennas as $originator) {
+            /** @var Antenna $relay */
+            foreach (array_filter($this->antennas, fn(Antenna $antenna
+            ) => ($antenna->identifier() !== $originator->identifier()) && ($antenna->frequency === $originator->frequency)) as $relay) {
+                if (
+                    $relay->row === $originator->row
+                ) {
+                    $wavelength = $relay->row - $originator->row;
+                    $this->antinodes[] = new AntiNode(new Coordinate($originator->row + $wavelength,
+                        $originator->column), [$originator->frequency]);
+                    $this->antinodes[] = new AntiNode(new Coordinate($originator->row + (-2 * $wavelength),
+                        $originator->column), [$originator->frequency]);
                 }
-                if ($node->coordinate->row - $antenna->coordinate->row > 0) {
-                    // The pair is to the right, so the anti is left 1d and right 2d
-                    if ($this->contains(new Coordinate($antenna->row, $antenna->column - $nodeDistance)) === true) {
-                        ++$antiNodes;
-                    }
-                    if ($this->contains(new Coordinate($antenna->row,
-                            $antenna->column + (2 * $nodeDistance))) === true) {
-                        ++$antiNodes;
-                    }
-                    $antenna->paired = true;
-                    $node->paired = true;
+                if (
+                    $relay->column === $originator->column
+                ) {
+                    $wavelength = $relay->column - $originator->column;
+                    $this->antinodes[] = new AntiNode(new Coordinate($originator->row,
+                        $originator->column + $wavelength), [$originator->frequency]);
+                    $this->antinodes[] = new AntiNode(new Coordinate($originator->row,
+                        $originator->column + (-2 * $wavelength)), [$originator->frequency]);
                 }
-                if ($node->coordinate->row - $antenna->coordinate->row < 0) {
-                    // The pair is to the left, so the anti is left 2d and right 1d
-                    if ($this->contains(new Coordinate($antenna->row,
-                            $antenna->column - (2 * $nodeDistance))) === true) {
-                        ++$antiNodes;
+                if (($verticalDelta = $relay->row - $originator->row) === ($horizontalDelta = $relay->column - $originator->column)) {
+                    // These are diagonal relays
+                    foreach (
+                        [
+                            'increment' => new Antinode(new Coordinate($originator->row + $verticalDelta,
+                                $originator->column + $horizontalDelta), [$originator->frequency]),
+                            'inverse' => new Antinode(new Coordinate($originator->row - $verticalDelta,
+                                $originator->column - $horizontalDelta), [$originator->frequency]),
+                        ]
+                        as $location => $node
+                    ) {
+                        if ($node->distanceTo($relay->coordinate) === 0) {
+                            $node = new Antinode(new Coordinate(
+                                $node->row + ($location === 'inverse' ? -$verticalDelta : $verticalDelta),
+                                $node->column + ($location === 'inverse' ? -$horizontalDelta : $horizontalDelta)
+                            ),
+                                [$originator->frequency]);
+                        }
+                        $this->antinodes[] = $node;
                     }
-                    if ($this->contains(new Coordinate($antenna->row,
-                            $antenna->column + $nodeDistance)) === true) {
-                        ++$antiNodes;
-                    }
-                    $antenna->paired = true;
-                    $node->paired = true;
-                }
-            }
-            if ($node->coordinate->column === $antenna->coordinate->column) {
-                $nodeDistance = $antenna->coordinate->distanceTo($node->coordinate);
-                if ($nodeDistance === 0) {
-                    // Same node
-                    continue;
-                }
-                if ($node->coordinate->column - $antenna->coordinate->column > 0) {
-                    // The pair is down, so the anti is up 1d and down 2d
-                    if ($this->contains(new Coordinate($antenna->row + (2 * $nodeDistance),
-                            $antenna->column)) === true) {
-                        ++$antiNodes;
-                    }
-                    if ($this->contains(new Coordinate($antenna->row - $nodeDistance, $antenna->column)) === true) {
-                        ++$antiNodes;
-                    }
-                    $antenna->paired = true;
-                    $node->paired = true;
-                }
-                if ($node->coordinate->column - $antenna->coordinate->column < 0) {
-                    // The pair is down, so the anti is down 1d and up 2d
-                    if ($this->contains(new Coordinate($antenna->row + $nodeDistance, $antenna->column)) === true) {
-                        ++$antiNodes;
-                    }
-                    if ($this->contains(new Coordinate($antenna->row - (2 * $nodeDistance),
-                            $antenna->column)) === true) {
-                        ++$antiNodes;
-                    }
-                    $antenna->paired = true;
-                    $node->paired = true;
-                }
-            }
-            foreach ($seCoords as $se) {
-                if ($node->distanceTo($se) === 0) {
-                    // Pair to our se, so there is anti at se 2d the distance from antenna and 1d nw
-                    if ($this->contains(
-                        new Coordinate(
-                            $antenna->row + (2 * abs($node->row - $antenna->row)),
-                            $antenna->column + (2 * abs($node->column - $antenna->column))
-                        )
-                    )) {
-                        ++$antiNodes;
-                        echo "Found pair going SE for frequency {$antenna->frequency} at {$antenna->column},{$antenna->row}\n";
-                    }
-                    if ($this->contains(
-                        new Coordinate(
-                            $antenna->row - (abs($node->row - $antenna->row)),
-                            $antenna->column - (abs($node->column - $antenna->column))
-                        )
-                    )) {
-                        ++$antiNodes;
-                        echo "Found pair going SE for frequency {$antenna->frequency} at {$antenna->column},{$antenna->row}\n";
-                    }
-                    $antenna->paired = true;
-                    $node->paired = true;
                 }
             }
         }
 
-        return $antiNodes;
+        $this->collapseWavelengths();
+
+        return $this;
+    }
+
+    private function collapseWavelengths(): void
+    {
+        echo "Collapsing node interference.\n";
+        $collapsed = false;
+        while (!$collapsed) {
+            $collapsed = true;
+            /** @var AntiNode $antinode */
+            foreach ($this->antinodes as $stable => $antinode) {
+                /**
+                 * @var int $index
+                 * @var AntiNode $interference
+                 */
+                foreach ($this->antinodes as $index => $interference) {
+                    if ($antinode->distanceTo($interference->coordinate) === 0 && $stable !== $index) {
+                        $antinode->broadcasts($interference->broadcasting());
+                        unset($this->antinodes[$index]);
+                        $collapsed = false;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -258,7 +248,9 @@ while (!feof($inputStream)) {
     $grid[] = str_split(trim(fgets($inputStream)));
 }
 
-$map = (new Map($grid))->transform();
+$m = new Map($grid);
+echo $m.PHP_EOL;
+echo count($m->antinodes).PHP_EOL;
 
 //echo array_reduce($map->antennas, fn($carry, $node) => $carry + $map->antiNodes($node), 0).PHP_EOL;
 
