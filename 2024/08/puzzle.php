@@ -16,7 +16,7 @@ readonly class Coordinate implements Stringable
         try {
             return ($destination->row - $this->row) / ($destination->column - $this->column);
         } catch (DivisionByZeroError) {
-            return null;
+            return ($destination->row - $this->row) > 0 ? '-INF' : 'INF';
         }
     }
 
@@ -25,6 +25,8 @@ readonly class Coordinate implements Stringable
         return "{$this->column}-{$this->row}";
     }
 }
+
+assert((new Coordinate(20, 0))->slope(new Coordinate(1, 0)) === "INF");
 
 /**
  * @mixin Coordinate
@@ -138,9 +140,10 @@ class Map implements Stringable
         $representation = '';
         foreach ($this->grid as $x => $row) {
             foreach ($row as $y => $cell) {
+                /** @var AntiNode $antinode */
                 foreach ($this->antinodes as $antinode) {
                     if ((string) $antinode === "$y-$x") {
-                        $representation .= '#';
+                        $representation .= $antinode->broadcasting()[0];
                         continue 2;
                     }
                 }
@@ -185,34 +188,91 @@ class Map implements Stringable
         foreach ($this->antennas as $originator) {
             echo "\tFor originator {$originator}\n";
             /** @var Antenna $relay */
-            foreach (array_filter($this->antennas, fn(Antenna $antenna
-            ) => ($antenna->identifier() !== $originator->identifier()) && ($antenna->frequency === $originator->frequency)) as $relay) {
-                foreach ($this->grid as $row => $entries) {
-                    foreach ($entries as $column => $cell) {
-                        $position = new Coordinate($row, $column);
-                        if (
-                            $relay->row !== $originator->row
-                            && $relay->column !== $originator->column
-                            && $position->slope($originator->coordinate) !== $originator->slope($relay->coordinate)
-                        ) {
-                            continue;
+            foreach (
+                array_filter(
+                    $this->antennas,
+                    fn(Antenna $antenna) => ($antenna->identifier() !== $originator->identifier())
+                        && ($antenna->frequency === $originator->frequency)
+                ) as $relay) {
+                $distance = $originator->distanceTo($relay->coordinate);
+                $slope = $originator->slope($relay->coordinate);
+                if ($slope === 'INF') {
+                    /**
+                     * This is a vertical line; INF means that the relay is "above" the originator.
+                     * Therefor there is a node at ($originator->row + $distance, $originator->column) "below"
+                     * the originator and one at ($relay->row - $distance, $relay->column)
+                     */
+                    if ($this->contains(($lowerNode = new AntiNode(new Coordinate($originator->row + $distance, $originator->column), [$originator->frequency]))->coordinate)) {
+                        $this->antinodes[] = $lowerNode;
+                    }
+                    if ($this->contains(($upperNode = new AntiNode(new Coordinate($relay->row - $distance, $relay->column), [$originator->frequency]))->coordinate)) {
+                        $this->antinodes[] = $upperNode;
+                    }
+                    continue;
+                }
+                if ($slope === '-INF') {
+                    /**
+                     * This is a vertical line; INF means that the relay is "below" the originator.
+                     * Therefor there is a node at ($relay->row + $distance, $relay->column) "below"
+                     * the relay and one at ($originator->row - $distance, $originator->column)
+                     */
+                    if ($this->contains(($lowerNode = new AntiNode(new Coordinate($relay->row + $distance, $relay->column), [$originator->frequency]))->coordinate)) {
+                        $this->antinodes[] = $lowerNode;
+                    }
+                    if ($this->contains(($upperNode = new AntiNode(new Coordinate($originator->row - $distance, $originator->column), [$originator->frequency]))->coordinate)) {
+                        $this->antinodes[] = $upperNode;
+                    }
+                    continue;
+                }
+                if ($slope === 0) {
+                    /**
+                     * This is a horizontal line. The "rightmost" antenna can be determined by comparing the columns;
+                     * to the "right"" of this is by the distance one node. To the "left" of the other is another.
+                     */
+                    if ($relay->column > $originator->column) {
+                        // The relay is to the "right".
+                        if ($this->contains(($rightNode = new AntiNode(new Coordinate($relay->row, $relay->column+$distance), [$originator->frequency]))->coordinate)) {
+                            $this->antinodes[] = $rightNode;
                         }
-                        $distances = [
-                            $position->distanceTo($originator->coordinate),
-                            $position->distanceTo($relay->coordinate),
-                        ];
-
-                        if (in_array(0, $distances)) {
-                            continue;
+                        if ($this->contains(($leftNode = new AntiNode(new Coordinate($originator->row, $originator->column - $distance), [$originator->frequency]))->coordinate)) {
+                            $this->antinodes[] = $leftNode;
                         }
-
-                        sort($distances);
-
-                        if ((($distances[1] / $distances[0]) === 2) && empty(array_filter($this->antinodes,
-                                fn(AntiNode $node) => (string) $node === (string) $position))) {
-                            $this->antinodes[] = new AntiNode($position, [$originator->frequency]);
+                    } else {
+                        if ($this->contains(($rightNode = new AntiNode(new Coordinate($originator->row, $originator->column+$distance), [$originator->frequency]))->coordinate)) {
+                            $this->antinodes[] = $rightNode;
+                        }
+                        if ($this->contains(($upperNode = new AntiNode(new Coordinate($relay->row, $relay->column - $distance), [$originator->frequency]))->coordinate)) {
+                            $this->antinodes[] = $upperNode;
                         }
                     }
+                    continue;
+                }
+                /**
+                 * The simple ones are accounted for. Now we must determine the location of nodes on a line
+                 * with a given slope.
+                 */
+                $dx = fn ($slope) => ($distance / sqrt($distance+pow($slope,2)));
+                $dy = fn ($slope) => round(($slope * $dx($slope)),0);
+                echo "\tSlope: $slope\n\tDelta X: {$dx($slope)}\n\tDelta Y: {$dy($slope)}\n";
+                // We need to know which is "left"
+                if ($originator->column > $relay->column) {
+                    // The relay is "left"
+                    if ($this->contains(($node = new AntiNode(new Coordinate($relay->row - $dx($slope), $relay->column - $dy($slope)), ['.']))->coordinate)) {
+                        $this->antinodes[] = $node;
+                    }
+                    if ($this->contains(($node = new AntiNode(new Coordinate($originator->row + $dx($slope), $originator->column + $dy($slope)), ['.']))->coordinate)) {
+                        $this->antinodes[] = $node;
+                    }
+                } else {
+                    // The relay is to the right
+                    if ($this->contains(($node = new AntiNode(new Coordinate($relay->row + $dy($slope), round($relay->column + $dx($slope))), ['1']))->coordinate)) {
+                        $this->antinodes[] = $node;
+                        echo "Added $node\nFrom $relay\n";
+                    }
+                    echo "DEBUG: $node\n";
+//                    if ($this->contains(($node = new AntiNode(new Coordinate($originator->row - $dx($slope), $originator->column - $dy($slope)), ['2']))->coordinate)) {
+//                        $this->antinodes[] = $node;
+//                    }
                 }
             }
         }
@@ -233,6 +293,6 @@ $m = new Map($grid);
 echo $m.PHP_EOL;
 echo $count = count($m->antinodes).PHP_EOL;
 
-if (261 >= $count || $count >= 2455) {
+if ((261 >= $count) || ($count >= 2455)) {
     echo "WRONG!\n";
 }
