@@ -7,28 +7,28 @@ function defrag($initial): int
 {
     $map = '';
     $isFile = true;
-    $file = 0;
+    $files = [];
     foreach (str_split($initial) as $size) {
-        $id = $isFile ? $file++ : '.';
-        echo "Padding with $id for $size\n";
+        if ($isFile) {
+            $files[] = $size;
+        }
+        $id = $isFile ? array_key_last($files) : '.';
         $map .= str_repeat($id.',', $size);
         $isFile = !$isFile;
     }
 
-    $tick = 1;
-    while (str_contains(rtrim($map, '.,'), '.')) {
-        if (preg_match('/(\d+?,)(?:\.,)*$/', $map, $matches) === 0) {
-            echo "Confused by matching.\n";
-            break;
-        };
-        $map = substr_replace($map, '.,', strrpos($map, $matches[1]), strlen($matches[1]));
-        $map = substr_replace($map, $matches[1], strpos($map, '.,'), 2);
-        echo '.';
-        if ($tick++ % 80 === 0) {
-            echo "\n";
+    echo str_replace(',', '', $map).PHP_EOL;
+    foreach(array_reverse($files, true) as $id=>$size) {
+        echo "Moving $id if able.\n";
+        $file = str_repeat("$id,", $size);
+        $required= str_repeat('.,', $size);
+        if (($firstBlock = strpos($map, $required)) && $firstBlock < strpos($map, $file)) {
+            // Remove the file from existing location.
+            $map=substr_replace($map, $required, strpos($map, $file), strlen($file));
+            // Put file in place
+            $map = substr_replace($map, $file, $firstBlock, strlen($required));
         }
     }
-    echo "\n$tick iterations.\n";
 
     $checksum = 0;
     foreach (explode(',', $map) as $position => $id) {
@@ -37,8 +37,5 @@ function defrag($initial): int
 
     return $checksum;
 }
-
-// Verify Part One Works
-assert(defrag('2333133121414131402') === 1928);
 
 echo 'Checksum: ' . defrag($line).PHP_EOL;
