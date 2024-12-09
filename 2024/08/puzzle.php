@@ -57,7 +57,7 @@ class Antenna implements Stringable
 
     public function identifier(): string
     {
-        return "{$this->frequency}-{$this->coordinate}";
+        return $this->coordinate;
     }
 
     public function __toString(): string
@@ -200,13 +200,17 @@ class Map implements Stringable
                      * Therefor there is a node at ($originator->row + $distance, $originator->column) "below"
                      * the originator and one at ($relay->row - $distance, $relay->column)
                      */
-                    if ($this->contains(($lowerNode = new AntiNode(new Coordinate($originator->row + $distance,
+                    $factor = 1;
+                    while ($this->contains(($lowerNode = new AntiNode(new Coordinate($originator->row + ($factor*$distance),
                         $originator->column), [$originator->frequency]))->coordinate)) {
                         $this->antinodes[] = $lowerNode;
+                        $factor++;
                     }
-                    if ($this->contains(($upperNode = new AntiNode(new Coordinate($relay->row - $distance,
+                    $factor = 1;
+                    while ($this->contains(($upperNode = new AntiNode(new Coordinate($relay->row - ($factor * $distance),
                         $relay->column), [$originator->frequency]))->coordinate)) {
                         $this->antinodes[] = $upperNode;
+                        $factor++;
                     }
                     continue;
                 }
@@ -216,13 +220,17 @@ class Map implements Stringable
                      * Therefor there is a node at ($relay->row + $distance, $relay->column) "below"
                      * the relay and one at ($originator->row - $distance, $originator->column)
                      */
-                    if ($this->contains(($lowerNode = new AntiNode(new Coordinate($relay->row + $distance,
+                    $factor = 1;
+                    while ($this->contains(($lowerNode = new AntiNode(new Coordinate($relay->row + ($factor *$distance),
                         $relay->column), [$originator->frequency]))->coordinate)) {
                         $this->antinodes[] = $lowerNode;
+                        $factor++;
                     }
-                    if ($this->contains(($upperNode = new AntiNode(new Coordinate($originator->row - $distance,
+                    $factor = 1;
+                    if ($this->contains(($upperNode = new AntiNode(new Coordinate($originator->row - ($factor * $distance),
                         $originator->column), [$originator->frequency]))->coordinate)) {
                         $this->antinodes[] = $upperNode;
+                        $factor++;
                     }
                     continue;
                 }
@@ -233,32 +241,41 @@ class Map implements Stringable
                      */
                     if ($relay->column > $originator->column) {
                         // The relay is to the "right".
-                        if ($this->contains(($rightNode = new AntiNode(new Coordinate($relay->row,
-                            $relay->column + $distance), [$originator->frequency]))->coordinate)) {
+                        $factor = 1;
+                        while ($this->contains(($rightNode = new AntiNode(new Coordinate($relay->row,
+                            $relay->column + ($factor *$distance)), [$originator->frequency]))->coordinate)) {
                             $this->antinodes[] = $rightNode;
+                            $factor++;
                         }
-                        if ($this->contains(($leftNode = new AntiNode(new Coordinate($originator->row,
-                            $originator->column - $distance), [$originator->frequency]))->coordinate)) {
+                        $factor = 1;
+                        while ($this->contains(($leftNode = new AntiNode(new Coordinate($originator->row,
+                            $originator->column - ($factor * $distance)), [$originator->frequency]))->coordinate)) {
                             $this->antinodes[] = $leftNode;
+                            $factor++;
                         }
                     } else {
-                        if ($this->contains(($rightNode = new AntiNode(new Coordinate($originator->row,
-                            $originator->column + $distance), [$originator->frequency]))->coordinate)) {
+                        $factor = 1;
+                        while ($this->contains(($rightNode = new AntiNode(new Coordinate($originator->row,
+                            $originator->column + ($factor * $distance)), [$originator->frequency]))->coordinate)) {
                             $this->antinodes[] = $rightNode;
+                            $factor++;
                         }
-                        if ($this->contains(($upperNode = new AntiNode(new Coordinate($relay->row,
-                            $relay->column - $distance), [$originator->frequency]))->coordinate)) {
+                        $factor = 1;
+                        while ($this->contains(($upperNode = new AntiNode(new Coordinate($relay->row,
+                            $relay->column - ($factor *$distance)), [$originator->frequency]))->coordinate)) {
                             $this->antinodes[] = $upperNode;
+                            $factor++;
                         }
                     }
                     continue;
                 }
-                if (
+                $factor = 1;
+                while (
                     $this->contains(
                         ($node = new AntiNode(
                             new Coordinate(
-                                $originator->row < $relay->row ? $originator->row - ($relay->row - $originator->row) : $originator->row + ($originator->row - $relay->row),//$relay->row - ($relay->row - $originator->row),
-                                $originator->column > $relay->column ? $originator->column + ($originator->column - $relay->column) : $originator->column - ($relay->column-$originator->column)//$relay->column - ($originator->column - $relay->column),
+                                $originator->row < $relay->row ? $originator->row - ($factor*($relay->row - $originator->row)) : $originator->row + ($factor*($originator->row - $relay->row)),
+                                $originator->column > $relay->column ? $originator->column + ($factor*($originator->column - $relay->column)) : $originator->column - ($factor*($relay->column-$originator->column))
                             ),
                             [$originator->frequency]
                         ))
@@ -266,6 +283,7 @@ class Map implements Stringable
                     )
                 ) {
                     $this->antinodes[] = $node;
+                    $factor++;
                 }
             }
         }
@@ -286,9 +304,8 @@ while (!feof($inputStream)) {
 
 $m = new Map($grid);
 echo $m.PHP_EOL;
-echo $count = count($m->antinodes).PHP_EOL;
+echo "Antinodes ".count($m->antinodes).PHP_EOL;
+$repeatingAntennas = array_keys(array_filter(array_count_values(array_map(fn (Antenna $antenna) => $antenna->frequency, $m->antennas)), fn (int $count) => $count > 1));
+$broadcastNodes = array_diff(array_filter($m->antennas, fn (Antenna $antenna) => in_array($antenna->frequency, $repeatingAntennas)), $m->antinodes);
 
-// 328 is wrong
-if ((261 >= $count) || ($count >= 2455)) {
-    echo "WRONG!\n";
-}
+echo $count = count($m->antinodes)+count($broadcastNodes).PHP_EOL;
