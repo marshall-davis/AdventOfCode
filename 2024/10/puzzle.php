@@ -89,7 +89,8 @@ class Map
             if (($coordinate->height === 8) && ($path->height === 9)) {
                 echo "\tReached summit at {$path}\n";
                 $this->trailheads[(string)($trailhead ?? $coordinate)][] = $path;
-                $this->trailheads[(string)($trailhead ?? $coordinate)] = array_unique($this->trailheads[(string)($trailhead ?? $coordinate)]);
+                // This line gathers the score, without it this becomes the rating.
+//                $this->trailheads[(string)($trailhead ?? $coordinate)] = array_unique($this->trailheads[(string)($trailhead ?? $coordinate)]);
                 continue;
             }
 
