@@ -1,0 +1,21 @@
+{
+    "name": "marshall/advent-of-code",
+    "autoload": {
+        "psr-4": {
+            "Marshall\\AdventOfCode\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Marshall Davis",
+            "email": "marshall@exposuresoftware.comm"
+        }
+    ],
+    "require": {
+        "symfony/console": "^7.2",
+        "nesbot/carbon": "^3.8"
+    },
+    "scripts": {
+        "puzzle": "Marshall\\AdventOfCode\\Scripts\\PuzzleCommand"
+    }
+}
