@@ -9,6 +9,13 @@ class Robot
     }
 }
 
+function display(array $map) {
+    foreach ($map as $row) {
+        echo implode(array_map(fn(int $c) => $c === 0 ? '.' : $c, $row))."\n";
+    }
+    echo PHP_EOL;
+}
+
 $height = 103;
 $width = 101;
 $time = 100;
@@ -27,12 +34,8 @@ foreach ($robots as $robot) {
     $grid[$robot->x][$robot->y]++;
 }
 
-foreach ($grid as $row) {
-    echo implode(array_map(fn (int $c) => $c === 0 ? '.':$c, $row))."\n";
-}
-echo "\n";
-
-for ($t = 1; $t <= $time; $t++) {
+$low = null;
+for ($t = 1; true; $t++) {
     /** @var Robot $robot */
     foreach ($robots as $robot) {
         $robot->x += $robot->horizontal;
@@ -53,43 +56,36 @@ for ($t = 1; $t <= $time; $t++) {
     }
 
 
-
-
     $grid = array_pad([], $height, array_pad([], $width, 0));
 
     foreach ($robots as $robot) {
         $grid[$robot->y][$robot->x]++;
     }
 
-    foreach ($grid as $row) {
-        echo implode(array_map(fn (int $c) => $c === 0 ? '.':$c, $row))."\n";
-    }
+    $q1 = 0;
+    $q2 = 0;
+    $q3 = 0;
+    $q4 = 0;
 
-    echo "\n";
+    foreach ($robots as $robot) {
+        if ($robot->x >= ceil($width / 2) && $robot->y < floor($height / 2)) {
+            $q2++;
+        }
+        if ($robot->x < floor($width / 2) && $robot->y < floor($height / 2)) {
+            $q1++;
+        }
+        if ($robot->x < floor($width / 2) && $robot->y >= ceil($height / 2)) {
+            $q3++;
+        }
+        if ($robot->x >= ceil($width / 2) && $robot->y >= ceil($height / 2)) {
+            $q4++;
+        }
+    }
+    $safe = $q1 * $q2 * $q3 * $q4;
+    if (is_null($low) || $safe < $low) {
+        // Bunching up?
+        echo "Seconds past $t\n";
+        $low = $safe;
+        display($grid);
+    }
 }
-
-$q1 = 0;
-$q2 = 0;
-$q3 = 0;
-$q4 = 0;
-
-foreach ($robots as $robot) {
-    if ($robot->x >= ceil($width/2) && $robot->y < floor($height/2)) {
-        $q2++;
-    }
-    if ($robot->x < floor($width/2) && $robot->y < floor($height/2)) {
-        $q1++;
-    }
-    if ($robot->x < floor($width/2) && $robot->y >=ceil($height/2)) {
-        $q3++;
-    }
-    if ($robot->x >= ceil($width/2) && $robot->y >=ceil($height/2)) {
-        $q4++;
-    }
-}
-echo "$q1 - $q2 - $q3 - $q4\n";
-$safe = $q1 * $q2 * $q3 * $q4;
-echo "safety: $safe\n";
-
-echo 256598166 <= $safe ? 'WRONG!':'';
-echo PHP_EOL;
