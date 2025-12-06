@@ -7,21 +7,38 @@ $input = fopen('input.txt', 'r+');
 
 $lines = [];
 while (!feof($input)) {
-    $lines[] = array_values(array_filter(array_map('trim', explode(" ", trim(fgets($input))))));
+    $lines[] = rtrim(fgets($input), "\t\r\n\0\x0B");
 }
+$operators = preg_split('/\s+/', trim(array_pop($lines)), flags: PREG_SPLIT_OFFSET_CAPTURE);
 
-$operators = array_values(array_pop($lines));
 $results = [];
-for($i = 0; $i < count($lines[0]); $i++) {
-    $results[] = match($operators[$i]) {
-        '+' => array_sum(array_column($lines, $i)),
-        '*' => array_product(array_column($lines, $i)),
+foreach ($operators as $problem => $operator) {
+    $operands = array_map(fn($operand) => substr($operand, $operator[1],
+        array_key_last($operators) === $problem ? null : ($operators[$problem + 1][1] - $operator[1] -1)), $lines);
+    $results[] = match ($operator[0]) {
+        '+' => array_sum(cephalopod($operands)),
+        '*' => array_product(cephalopod($operands)),
         default => throw new Exception('Invalid operator.')
     };
 }
 
-foreach ($results as $column =>  $result) {
-    echo "Column $column: $result\n";
+/**
+ * @param  list<string>  $operands
+ * @return array
+ */
+function cephalopod(array $operands): array
+{
+    $cephalopodOperands = [];
+
+    $operands = array_map(function (string $operand) {
+        return array_map(fn (string $segment) => $segment !== ' ' ? $segment : null, str_split($operand));
+    }, $operands);
+    $longest = max(array_map('count', $operands));
+    for ($i = $longest - 1; $i >= 0; $i--) {
+        $cephalopodOperands[] = implode('', array_column($operands, $i));
+    }
+
+    return $cephalopodOperands;
 }
 
 echo "Total: ".array_sum($results)."\n";
