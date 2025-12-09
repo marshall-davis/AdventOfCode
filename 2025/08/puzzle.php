@@ -3,9 +3,7 @@
 declare(strict_types=1);
 
 $input = fopen('input.txt', 'r+');
-$connections = 1000;
 //$input = fopen('example.txt', 'r+');
-//$connections = 10;
 
 readonly class Point implements Stringable
 {
@@ -28,7 +26,9 @@ class Junction implements Stringable
         public readonly int $id,
         public readonly Point $point,
         /** @var list<Junction> */
-        private array $connections = []
+        private array $connections = [],
+        /** @var list<int> */
+        private ?array $circuit = null
     ) {
     }
 
@@ -41,23 +41,34 @@ class Junction implements Stringable
         if ($reciprocal) {
             $junction->connect($this, false);
         }
+        $this->refreshCircuit();
     }
 
     /**
      * @param  Junction|null  $incoming
-     * @return list<Junction>
+     * @return list<int>
      */
     public function circuit(?Junction $incoming = null): array
     {
-        return array_unique(array_merge([$this],$this->connections,
-            ...array_map(
-                fn(Junction $junction) => $junction->circuit($this),
-                array_filter($this->connections, fn(Junction $junction) => $junction->id !== $incoming?->id))));
+        $connectionsWithoutIncoming = array_filter($this->connections,
+            fn(Junction $junction) => $junction->id !== $incoming?->id);
+        $connectionsWithoutIncoming = array_map(
+            fn(Junction $junction) => $junction->circuit($this),
+            $connectionsWithoutIncoming);
+        $connectionsWithoutIncoming = array_merge([$this->id],
+            array_map(fn(Junction $connection) => $connection->id, $this->connections), ...$connectionsWithoutIncoming);
+        return array_unique($connectionsWithoutIncoming);
+    }
+
+    public function refreshCircuit(): self
+    {
+        $this->circuit = null;
+        return $this;
     }
 
     public function connected(?Junction $to = null): bool
     {
-        return $to === null ? !!$this->connections : in_array($to->id, array_column($this->circuit(), 'id'));
+        return $to === null ? !!$this->connections : in_array($to->id, $this->circuit());
     }
 
     public function __toString(): string
@@ -71,23 +82,12 @@ function distance(Point $a, Point $b): int
     return (int) sqrt(pow($a->x - $b->x, 2) + pow($a->y - $b->y, 2) + pow($a->z - $b->z, 2));
 }
 
-function closest(Junction $junction, array $junctions): Junction
-{
-    $available = array_filter($junctions, fn(Junction $target) => $junction->connected($target) === false);
-    uasort($available,
-        fn(Junction $a, Junction $b) => distance($junction->point, $a->point) <=> distance($junction->point,
-                $b->point));
-    return array_first($available);
-}
-
 /** @var list<Junction> $junctions */
 $junctions = [];
 while (!feof($input)) {
     $junctions[] = new Junction(count($junctions ?? []),
         new Point(...array_map('intval', explode(',', fgets($input)))));
 }
-
-$circuits = [];
 
 $distances = [];
 
@@ -103,29 +103,30 @@ foreach ($junctions as $a) {
     }
 }
 asort($distances);
-//assert(array_key_first($distances) === '0-19', 'Distance formulas are incorrect.');
-//foreach (array_map(fn (string $key) => $key.' '.$distances[$key], array_combine(range(1, count($distances)), array_keys($distances))) as $pair => $distance) {
-//    echo "$pair: $distance\n";
-//}
 
-while ($connections--) {
+
+do {
+    echo "Trying ".array_key_first($distances)."\n";
     $pair = array_key_first($distances);
+    if ($pair === null) {
+        throw new RuntimeException('Out of options!');
+    }
+
     array_shift($distances);
     [$a, $b] = explode('-', $pair);
 
-    if ($junctions[$a]->connected($junctions[$b])) {
-        echo "Already connected {$junctions[$a]} and {$junctions[$b]}\n";
-//        $connections++; // In part one the elves DO connect the junctions, dummies
-        continue;
+    if (!$junctions[$a]->connected($junctions[$b])) {
+        $junctions[$a]->connect($junctions[$b]);
     }
-    echo "Connecting {$junctions[$a]} and {$junctions[$b]}\n";
-    $junctions[$a]->connect($junctions[$b]);
-//    echo 'Sizes '. implode(', ',$circuitSizes =array_count_values(array_map(fn (Junction $junction) => count($junction->circuit()), $junctions))).PHP_EOL;
-}
 
-$circuitSizes = array_unique(array_map(fn (Junction $junction) => count($junction->circuit()), $junctions));
-arsort($circuitSizes);
-$pertinent = array_slice($circuitSizes, offset: 0, length: 3);
-echo 'Pertinent circuit sizes: '.implode(', ', $pertinent).PHP_EOL;
+    foreach ($junctions as $junction) {
+        if (!array_diff_key($junctions, array_flip($junctions[$a]->refreshCircuit()->circuit()))) {
+            break 2;
+        }
+    }
+} while (true);
 
-echo 'Circuit product: '.array_product($pertinent).PHP_EOL;
+echo "{$junctions[$a]->point->x} * {$junctions[$b]->point->x}\n";
+$wall = $junctions[$a]->point->x * $junctions[$b]->point->x;
+assert($wall < 5166672507, "$wall is too high!");
+echo 'Wall distance: '.$wall.PHP_EOL;
